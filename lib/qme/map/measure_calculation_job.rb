@@ -44,7 +44,7 @@ module QME
             if !fqr.patients_cached?
               flmap.map_records_into_measure_groups
             end
-            fullListResult = flmap.count_records_in_measure_groups(0, 0, false)
+            fullListResult = flmap.count_records_in_measure_groups(0, 0)
           end
           # /Full List Calculation
           
@@ -58,7 +58,7 @@ module QME
           
           tick('Calculating group totals') if respond_to? :tick
 
-          result = map.count_records_in_measure_groups(fullListResult['numerator'], fullListResult['denominator'], true)
+          result = map.count_records_in_measure_groups(fullListResult['numerator'], fullListResult['denominator'])
 
           completed("#{options['measure_id']}#{options['sub_id']}: p#{result['population']}, d#{result['denominator']}, n#{result['numerator']}, e#{result['exclusions']}") if respond_to? :completed
         end

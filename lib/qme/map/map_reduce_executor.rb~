@@ -23,7 +23,7 @@ module QME
       # for the measure. The totals are placed in a document in the query_cache
       # collection.
       # @return [Hash] measure groups (like numerator) as keys, counts as values
-      def count_records_in_measure_groups(fullListNumerator, fullListDenominator)
+      def count_records_in_measure_groups(full_numer, full_denom, full)
         patient_cache = get_db.collection('patient_cache')
         base_query = {'value.measure_id' => @measure_id, 'value.sub_id' => @sub_id,
                       'value.effective_date' => @parameter_values['effective_date'],
@@ -52,11 +52,11 @@ module QME
 
         result.merge!(execution_time: (Time.now.to_i - @parameter_values['start_time'].to_i)) if @parameter_values['start_time']
 
-        result.merge!({ :fullListNumerator => fullListNumerator, :fullListDenominator => fullListDenominator })
+        result.merge!({ :full_numer => full_numer, :full_denom => full_denom })
 
-#        if get_db.collection("query_cache").find(result) == nil
+				if full
 	        get_db.collection("query_cache").save(result, safe: true)
-# 				end
+ 				end
  				      
         result
       end
