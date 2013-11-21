@@ -24,20 +24,23 @@ module QME
       
       def self.calculate(options)
         test_id = options['test_id'] ? BSON::ObjectId(options['test_id']) : nil
-
+				
+				full_filters = options['filters']
+				full_filters['providers'] = get_db.collection('providers').distinct("_id").map!(&:to_s)
+					
         qr = QualityReport.new(options['measure_id'], options['sub_id'], 'effective_date' => options['effective_date'], 'test_id' => test_id, 'filters' => options['filters'])
         if qr.calculated?
           completed("#{options['measure_id']}#{options['sub_id']} has already been calculated") if respond_to? :completed
         else
           # Full List Calculation
           fullListResult = nil
-          fqr = QualityReport.new(options['measure_id'], options['sub_id'], 'effective_date' => options['effective_date'], 'test_id' => test_id, 'filters' => nil)
+          fqr = QualityReport.new(options['measure_id'], options['sub_id'], 'effective_date' => options['effective_date'], 'test_id' => test_id, 'filters' => full_filters)
           if fqr.calculated?
             # pull the value
             cache = get_db.collection("query_cache")
             query = {:measure_id => options['measure_id'], :sub_id => options['sub_id'], 
                      :effective_date => options['effective_date'],
-                     :test_id => test_id, :filters => nil}
+                     :test_id => test_id, :filters => full_filters}
             fullListResult = cache.find_one(query)
           else
             flmap = QME::MapReduce::Executor.new(options['measure_id'], options['sub_id'], 'effective_date' => options['effective_date'], 'test_id' => test_id, 'filters' => nil, 'start_time' => Time.now.to_i)
