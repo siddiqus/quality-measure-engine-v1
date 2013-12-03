@@ -23,7 +23,7 @@ module QME
       # for the measure. The totals are placed in a document in the query_cache
       # collection.
       # @return [Hash] measure groups (like numerator) as keys, counts as values
-      def count_records_in_measure_groups(full_numer, full_denom)
+      def count_records_in_measure_groups(full_numer, full_denom, main_filters)
         patient_cache = get_db.collection('patient_cache')
         base_query = {'value.measure_id' => @measure_id, 'value.sub_id' => @sub_id,
                       'value.effective_date' => @parameter_values['effective_date'],
@@ -34,7 +34,7 @@ module QME
         query = base_query.clone
 
         query.merge!({'value.manual_exclusion' => {'$in' => [nil, false]}})
-        
+            
         result = {:measure_id => @measure_id, :sub_id => @sub_id, 
                   :effective_date => @parameter_values['effective_date'],
                   :test_id => @parameter_values['test_id'], :filters => @parameter_values['filters']}
@@ -51,11 +51,12 @@ module QME
          result.merge!(aggregate)
 
         result.merge!(execution_time: (Time.now.to_i - @parameter_values['start_time'].to_i)) if @parameter_values['start_time']
-
-        result.merge!({ :full_numer => full_numer, :full_denom => full_denom })
-
-        get_db.collection("query_cache").save(result, safe: true)
- 				      
+				
+				if main_filters != 0
+			  	result.merge!({ :full_numer => full_numer, :full_denom => full_denom })
+					result[:filters] = main_filters
+					get_db.collection("query_cache").save(result, safe: true)
+				end
         result
       end
 

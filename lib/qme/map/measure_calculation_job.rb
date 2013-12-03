@@ -25,43 +25,55 @@ module QME
       def self.calculate(options)
         test_id = options['test_id'] ? BSON::ObjectId(options['test_id']) : nil
 				
-				full_filters = options['filters']
-				full_filters['providers'] = get_db.collection('providers').distinct("_id").map!(&:to_s)
-					
+				full_filters = options['filters'].clone
+				full_filters['providers'] = get_db.collection('providers').distinct("_id").map {|x| x.to_s}
+				
         qr = QualityReport.new(options['measure_id'], options['sub_id'], 'effective_date' => options['effective_date'], 'test_id' => test_id, 'filters' => options['filters'])
+        fqr = QualityReport.new(options['measure_id'], options['sub_id'], 'effective_date' => options['effective_date'], 'test_id' => test_id, 'filters' => full_filters)
+        
         if qr.calculated?
           completed("#{options['measure_id']}#{options['sub_id']} has already been calculated") if respond_to? :completed
         else
-          # Full List Calculation
-          fullListResult = nil
-          fqr = QualityReport.new(options['measure_id'], options['sub_id'], 'effective_date' => options['effective_date'], 'test_id' => test_id, 'filters' => full_filters)
+#          # Full List Calculation
+#          fullListResult = nil
+#          fqr = QualityReport.new(options['measure_id'], options['sub_id'], 'effective_date' => options['effective_date'], 'test_id' => test_id, 'filters' => full_filters)
+#          if fqr.calculated?
+#            # pull the value
+#            cache = get_db.collection("query_cache")
+#            query = {:measure_id => options['measure_id'], :sub_id => options['sub_id'], 
+#                     :effective_date => options['effective_date'],
+#                     :test_id => test_id, :filters => full_filters}
+#            fullListResult = cache.find_one(query)
+#          else
+#            flmap = QME::MapReduce::Executor.new(options['measure_id'], options['sub_id'], 'effective_date' => options['effective_date'], 'test_id' => test_id, 'filters' => full_filters, 'start_time' => Time.now.to_i)
+#            if !fqr.patients_cached?
+#              flmap.map_records_into_measure_groups
+#            end
+#            fullListResult = flmap.count_records_in_measure_groups(nil, nil)
+#          end
+#          # /Full List Calculation
+
+					# full list
           if fqr.calculated?
             # pull the value
-            cache = get_db.collection("query_cache")
-            query = {:measure_id => options['measure_id'], :sub_id => options['sub_id'], 
-                     :effective_date => options['effective_date'],
-                     :test_id => test_id, :filters => full_filters}
-            fullListResult = cache.find_one(query)
+						full_result = fqr.result()
           else
-            flmap = QME::MapReduce::Executor.new(options['measure_id'], options['sub_id'], 'effective_date' => options['effective_date'], 'test_id' => test_id, 'filters' => nil, 'start_time' => Time.now.to_i)
-            if !fqr.patients_cached?
-              flmap.map_records_into_measure_groups
-            end
-            fullListResult = flmap.count_records_in_measure_groups(0, 0)
-          end
-          # /Full List Calculation
-          
+		        flmap = QME::MapReduce::Executor.new(options['measure_id'], options['sub_id'], 'effective_date' => options['effective_date'], 'test_id' => test_id, 'filters' => full_filters, 'start_time' => Time.now.to_i)
+		        if !fqr.patients_cached?
+		          flmap.map_records_into_measure_groups
+		        end
+		        full_result = flmap.count_records_in_measure_groups(0, 0, 0)
+ 					end
+ 					
           map = QME::MapReduce::Executor.new(options['measure_id'], options['sub_id'], 'effective_date' => options['effective_date'], 'test_id' => test_id, 'filters' => options['filters'], 'start_time' => Time.now.to_i)
-
           if !qr.patients_cached?
             tick('Starting MapReduce') if respond_to? :tick
             map.map_records_into_measure_groups
             tick('MapReduce complete') if respond_to? :tick
           end
-          
           tick('Calculating group totals') if respond_to? :tick
 
-          result = map.count_records_in_measure_groups(fullListResult['numerator'], fullListResult['denominator'])
+          result = map.count_records_in_measure_groups(full_result['numerator'], full_result['denominator'], options['filters'])
 
           completed("#{options['measure_id']}#{options['sub_id']}: p#{result['population']}, d#{result['denominator']}, n#{result['numerator']}, e#{result['exclusions']}") if respond_to? :completed
         end
